@@ -5,6 +5,10 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
+
+extern uint64 countnproc(void);
+extern uint64 countfreem(void);
 
 uint64
 sys_exit(void)
@@ -88,4 +92,27 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_trace(int mask)
+{
+  printf("sys_trace\n");
+  //讲参数放入到trace_mask中
+  argint(0, &(myproc()->trace_mask));
+  return 1;
+}
+
+
+uint64
+sys_sysinfo(void)
+{
+  struct sysinfo info;
+  info.freemem = countfreem();
+  info.nproc = countnproc();
+  uint64 st;
+  argaddr(0, &st);
+  if(copyout(myproc()->pagetable, st, (char *)&info, sizeof(info)) < 0)
+    return -1;
+  return 0;
 }

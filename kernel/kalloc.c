@@ -23,6 +23,7 @@ struct {
   struct run *freelist;
 } kmem;
 
+
 void
 kinit()
 {
@@ -79,4 +80,20 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+//计算空闲内存量
+uint64 countfreem(void)
+{
+  // uint allm = 128*1024*1024;
+  uint64 res = 0;
+  struct run *r;
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  while(r) {
+    res += PGSIZE;
+    r = r->next;
+  }
+  release(&kmem.lock);
+  return res;
 }
