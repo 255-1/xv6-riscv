@@ -103,7 +103,7 @@ sys_trace(int mask)
   return 1;
 }
 
-
+//sysinfo系统调用
 uint64
 sys_sysinfo(void)
 {
