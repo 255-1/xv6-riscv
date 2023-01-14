@@ -5,7 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
-
+#include "spinlock.h"
+#include "proc.h"
 /*
  * the kernel's page table.
  */
@@ -45,7 +46,7 @@ kvmmake(void)
 
   // allocate and map a kernel stack for each process.
   proc_mapstacks(kpgtbl);
-  
+
   return kpgtbl;
 }
 
@@ -54,6 +55,21 @@ void
 kvminit(void)
 {
   kernel_pagetable = kvmmake();
+}
+
+//建立一个新的内核副本
+pagetable_t _kvminit(void)
+{
+  pagetable_t kpgtbl = uvmcreate();
+  if(kpgtbl == 0) return 0;
+  // memmove(kpgtbl, kernel_pagetable, PGSIZE);
+  mappages(kpgtbl, UART0, PGSIZE, UART0, PTE_R | PTE_W);
+  mappages(kpgtbl, VIRTIO0, PGSIZE, VIRTIO0, PTE_R | PTE_W);
+  mappages(kpgtbl, PLIC, 0x400000, PLIC, PTE_R | PTE_W);
+  mappages(kpgtbl, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X);
+  mappages(kpgtbl, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W);
+  mappages(kpgtbl, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X);
+  return kpgtbl;
 }
 
 // Switch h/w page table register to the kernel's page table,
@@ -115,6 +131,8 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
+  //使用进程的内核页代替原来的pagetable
+  // pte = walk(myproc()->kpg, va, 0);
   if(pte == 0)
     return 0;
   if((*pte & PTE_V) == 0)
@@ -147,7 +165,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 
   if(size == 0)
     panic("mappages: size");
-  
+
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
@@ -338,7 +356,7 @@ void
 uvmclear(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
-  
+
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     panic("uvmclear");
@@ -435,5 +453,24 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
+  }
+}
+
+//Print a page table
+void vmprint(pagetable_t pagetable, int deep) {
+  if(deep == 0)
+    printf("page table %p\n", pagetable);
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V) {
+      for(int j=0; j<deep; ++j) {
+        printf(".. ");
+      }
+      uint64 child = PTE2PA(pte);
+      printf("%d: pte %p pa %p\n", i, pte, child);
+      if((pte & (PTE_R| PTE_W| PTE_X)) == 0) {
+        vmprint((pagetable_t) child, deep+1);
+      }
+    }
   }
 }
