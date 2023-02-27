@@ -503,3 +503,28 @@ sys_pipe(void)
   }
   return 0;
 }
+
+
+uint64
+sigalarm(void)
+{
+  struct proc *p = myproc();
+  int interval;
+  uint64 handler;
+  argint(0, &interval);
+  if(interval == 0) {
+    return 0;
+  }
+  argaddr(1, &handler);
+  p->handler = handler;
+  p->interval = interval;
+  return 0;
+}
+
+uint64
+sigreturn(void)
+{
+  // struct proc *p = myproc();
+  // printf("sigreturn\n");
+  return 0;
+}

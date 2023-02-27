@@ -104,4 +104,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int interval; //报警间隔
+  uint64 handler; //报警处理函数的地址
+  int t;
 };
